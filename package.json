@@ -1,16 +1,16 @@
 {
-  "name": "biometric-session-guard",
+  "name": "react-native-biometric-session-guard",
   "version": "0.1.0",
   "description": "A policy and state-machine layer that decides when a React Native app should require biometric re-authentication - idle timeout, background re-lock, and failed-attempt lockout, independent of any specific biometric library.",
   "license": "MIT",
   "author": "Shubham Shukla",
-  "homepage": "https://github.com/shubh-shukla/biometric-session-guard#readme",
+  "homepage": "https://github.com/shubh-shukla/react-native-biometric-session-guard#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/shubh-shukla/biometric-session-guard.git"
+    "url": "git+https://github.com/shubh-shukla/react-native-biometric-session-guard.git"
   },
   "bugs": {
-    "url": "https://github.com/shubh-shukla/biometric-session-guard/issues"
+    "url": "https://github.com/shubh-shukla/react-native-biometric-session-guard/issues"
   },
   "keywords": [
     "react-native",
