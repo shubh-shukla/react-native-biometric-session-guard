@@ -4,3 +4,4 @@ export type {
   AppStateStatus,
   BackgroundMonitorOptions,
 } from './backgroundMonitor.js';
+export { useBiometricSessionGuard } from './useBiometricSessionGuard.js';
