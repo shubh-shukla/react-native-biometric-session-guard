@@ -17,6 +17,9 @@ export function transition(
   now: number,
 ): GuardState {
   if (event.type === 'RESET') {
+    if (state.status === 'unlocked' && state.failedAttempts === 0) {
+      return state;
+    }
     return { status: 'unlocked', failedAttempts: 0 };
   }
 

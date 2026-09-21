@@ -1,1 +1,1 @@
-export const PACKAGE_NAME = 'react-native-biometric-session-guard';
+export * from './core/index.js';
