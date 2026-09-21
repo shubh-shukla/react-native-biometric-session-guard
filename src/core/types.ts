@@ -45,6 +45,5 @@ export interface SessionGuardPolicy {
   lockOnBackground: boolean;
   maxFailedAttempts: number;
   cooldownMinutes: number;
-  backgroundGraceMs?: number;
   storageAdapter?: StorageAdapter;
 }
