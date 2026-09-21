@@ -1,7 +1,19 @@
 import { transition, type TransitionPolicy } from './machine.js';
-import type { AuthOutcome, GuardEvent, GuardState, SessionGuardPolicy } from './types.js';
+import {
+  createInMemoryStorageAdapter,
+  readPersistedLockoutState,
+  writePersistedLockoutState,
+} from './storage.js';
+import type {
+  AuthOutcome,
+  GuardEvent,
+  GuardState,
+  SessionGuardPolicy,
+  StorageAdapter,
+} from './types.js';
 
 export interface SessionGuard {
+  readonly ready: Promise<void>;
   getState(): GuardState;
   subscribe(listener: (state: GuardState) => void): () => void;
   recordActivity(): void;
@@ -12,7 +24,17 @@ export interface SessionGuard {
   destroy(): void;
 }
 
-const INITIAL_STATE: GuardState = { status: 'unlocked', failedAttempts: 0 };
+function warnMissingStorageAdapter(): void {
+  if (process.env.NODE_ENV === 'production') {
+    return;
+  }
+  console.warn(
+    '[react-native-biometric-session-guard] No storageAdapter was provided. Falling back to an ' +
+      'in-memory adapter that will NOT survive an app kill, so the failed-attempt lockout can be ' +
+      'bypassed by force-quitting the app. Pass a persistent storageAdapter backed by AsyncStorage, ' +
+      'MMKV, or similar in production.',
+  );
+}
 
 export function createSessionGuard(policy: SessionGuardPolicy): SessionGuard {
   const transitionPolicy: TransitionPolicy = {
@@ -21,7 +43,12 @@ export function createSessionGuard(policy: SessionGuardPolicy): SessionGuard {
     cooldownMinutes: policy.cooldownMinutes,
   };
 
-  let state: GuardState = INITIAL_STATE;
+  const adapter: StorageAdapter = policy.storageAdapter ?? createInMemoryStorageAdapter();
+  if (!policy.storageAdapter) {
+    warnMissingStorageAdapter();
+  }
+
+  let state: GuardState = { status: 'locked', reason: 'initial', failedAttempts: 0 };
   let destroyed = false;
   const listeners = new Set<(state: GuardState) => void>();
 
@@ -67,6 +94,17 @@ export function createSessionGuard(policy: SessionGuardPolicy): SessionGuard {
     }
   };
 
+  const persist = (): void => {
+    const cooldownUntil = state.status === 'cooldown' ? state.cooldownUntil : undefined;
+    writePersistedLockoutState(adapter, {
+      failedAttempts: state.failedAttempts,
+      cooldownUntil,
+    }).catch(() => {
+      // Best-effort: a write failure only weakens the cross-kill guarantee, it
+      // doesn't affect the guard's correctness for the current process lifetime.
+    });
+  };
+
   function dispatch(event: GuardEvent): void {
     if (destroyed) {
       return;
@@ -77,12 +115,42 @@ export function createSessionGuard(policy: SessionGuardPolicy): SessionGuard {
     }
     state = next;
     syncTimersToState();
+    persist();
+    listeners.forEach((listener) => listener(state));
+  }
+
+  async function hydrate(): Promise<void> {
+    const persisted = await readPersistedLockoutState(adapter);
+    if (destroyed || !persisted) {
+      return;
+    }
+
+    const now = Date.now();
+    if (persisted.cooldownUntil !== undefined && persisted.cooldownUntil > now) {
+      state = {
+        status: 'cooldown',
+        failedAttempts: persisted.failedAttempts,
+        cooldownUntil: persisted.cooldownUntil,
+      };
+    } else if (persisted.cooldownUntil !== undefined) {
+      state = { status: 'locked', reason: 'cooldown-expired', failedAttempts: 0 };
+      persist();
+    } else if (persisted.failedAttempts > 0) {
+      state = { status: 'locked', reason: 'initial', failedAttempts: persisted.failedAttempts };
+    } else {
+      return;
+    }
+
+    syncTimersToState();
     listeners.forEach((listener) => listener(state));
   }
 
   syncTimersToState();
+  const readyPromise = hydrate();
 
   return {
+    ready: readyPromise,
+
     getState: () => state,
 
     subscribe(listener) {

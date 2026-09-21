@@ -1,4 +1,4 @@
-export type LockReason = 'idle' | 'background' | 'retry' | 'cooldown-expired';
+export type LockReason = 'initial' | 'idle' | 'background' | 'retry' | 'cooldown-expired';
 
 export type AuthOutcome = 'success' | 'failure' | 'cancelled';
 
